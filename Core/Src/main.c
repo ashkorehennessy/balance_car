@@ -63,6 +63,9 @@ PID left_wheel_speed_pid;
 PID right_wheel_speed_pid;
 int left_wheel_pidout;
 int right_wheel_pidout;
+float angle_offset;
+float speed_setpoint;
+float angle_setpoint;
 uint16_t pwm_max_arr;
 uint16_t feedforward;
 char buf[100];
@@ -113,7 +116,6 @@ int main(void)
   MX_I2C2_Init();
   MX_TIM1_Init();
   MX_USART2_UART_Init();
-  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
   /* Init MPU6050 */
@@ -132,34 +134,36 @@ int main(void)
   left_wheel.encoder_tim = &htim2;
   left_wheel.pwm_tim = &htim1;
   left_wheel.pwm_channel = TIM_CHANNEL_1;
-  left_wheel.motorpower1_gpiox = GPIOB;
+  left_wheel.motorpower1_gpio_port = GPIOB;
   left_wheel.motorpower1_gpio_pin = GPIO_PIN_14;
-  left_wheel.motorpower2_gpiox = GPIOB;
+  left_wheel.motorpower2_gpio_port = GPIOB;
   left_wheel.motorpower2_gpio_pin = GPIO_PIN_15;
   left_wheel.speed = 0;
 
   right_wheel.encoder_tim = &htim3;
   right_wheel.pwm_tim = &htim1;
   right_wheel.pwm_channel = TIM_CHANNEL_4;
-  right_wheel.motorpower1_gpiox = GPIOB;
+  right_wheel.motorpower1_gpio_port = GPIOB;
   right_wheel.motorpower1_gpio_pin = GPIO_PIN_13;
-  right_wheel.motorpower2_gpiox = GPIOB;
+  right_wheel.motorpower2_gpio_port = GPIOB;
   right_wheel.motorpower2_gpio_pin = GPIO_PIN_12;
   right_wheel.speed = 0;
   /* Init whells */
 
   pwm_max_arr = __HAL_TIM_GET_AUTORELOAD(&htim1);  // Get PWM max value
-  feedforward = pwm_max_arr * 0.095;  // This wheel needs more than 9.5% PWM to start
+  feedforward = pwm_max_arr * 0.00;  // ???
+  angle_offset = 1.50f;  // angle offset, based on the mpu6050 placement
+  speed_setpoint = 0;  // speed setpoint
+  angle_setpoint = 0;  // angle setpoint
 
   /* Init wheel PID */
-  left_wheel_stand_pid = PID_Init(45, 0, 280, pwm_max_arr, -pwm_max_arr);
-  right_wheel_stand_pid = PID_Init(45, 0, 280, pwm_max_arr, -pwm_max_arr);
-  left_wheel_speed_pid = PID_Init(-23, -0.115, 0, pwm_max_arr, -pwm_max_arr);
-  right_wheel_speed_pid = PID_Init(-23, -0.115, 0, pwm_max_arr, -pwm_max_arr);
+  left_wheel_stand_pid = PID_Init(60, 0, 380, pwm_max_arr, -pwm_max_arr);
+  right_wheel_stand_pid = PID_Init(60, 0, 380, pwm_max_arr, -pwm_max_arr);
+  left_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr, -pwm_max_arr);
+  right_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr, -pwm_max_arr);
   /* Init wheel PID */
 
   /* Timers */
-  HAL_TIM_Base_Start_IT(&htim4);
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
@@ -174,9 +178,16 @@ int main(void)
   {
 //    sprintf(buf,"speed:%d,%d,%d\r\n",left_wheel.speed,right_wheel.speed,temp);
 //    HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),1000);
-    sprintf(buf,"%.2f,%.2f,%d,%d,%d,%d\r\n",MPU6050.KalmanAngleX,MPU6050.KalmanAngleY,left_wheel.speed,left_wheel_pidout,right_wheel.speed,right_wheel_pidout);
-    HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),1000);
-    HAL_Delay(8);
+//    sprintf(buf,"%.2f,%.2f,%d,%d,%d,%d\r\n",MPU6050.KalmanAngleX,MPU6050.KalmanAngleY,left_wheel.speed,left_wheel_pidout,right_wheel.speed,right_wheel_pidout);
+//    HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),1000);
+//    HAL_Delay(50);
+    // move forward 5 seconds and backward 5 seconds loop
+    angle_setpoint = -1;
+    speed_setpoint = 10;
+    HAL_Delay(5000);
+    angle_setpoint = 1;
+    speed_setpoint = -10;
+    HAL_Delay(5000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

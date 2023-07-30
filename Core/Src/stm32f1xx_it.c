@@ -44,11 +44,13 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
 int count = 0;
+float real_angle_setpoint = 0;
+float real_speed_setpoint = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-
+float smooth_setpoint(float setpoint, float current_setpoint, float smooth_factor);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -58,7 +60,7 @@ int count = 0;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern TIM_HandleTypeDef htim4;
+
 /* USER CODE BEGIN EV */
 extern WHEEL left_wheel;
 extern WHEEL right_wheel;
@@ -71,6 +73,9 @@ extern PID left_wheel_speed_pid;
 extern PID right_wheel_speed_pid;
 extern int left_wheel_pidout;
 extern int right_wheel_pidout;
+extern float angle_offset;
+extern float speed_setpoint;
+extern float angle_setpoint;
 extern uint16_t pwm_max_arr;
 extern uint16_t feedforward;
 /* USER CODE END EV */
@@ -214,45 +219,54 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
-  * @brief This function handles TIM4 global interrupt.
+  * @brief This function handles EXTI line[15:10] interrupts.
   */
-void TIM4_IRQHandler(void)
+void EXTI15_10_IRQHandler(void)
 {
-  /* USER CODE BEGIN TIM4_IRQn 0 */
-  MPU6050_Read_All(&hi2c2, &MPU6050);
-  update_speed(&left_wheel);
-  update_speed(&right_wheel);
+  /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
-  // stand PID
-  left_wheel_pidout = PID_Calc(&left_wheel_stand_pid, MPU6050.KalmanAngleX, 0.76);
-  right_wheel_pidout = PID_Calc(&right_wheel_stand_pid, MPU6050.KalmanAngleX, 0.76);
+  if(count == 15) {
+    MPU6050_Read_All(&hi2c2, &MPU6050);
+    update_speed(&left_wheel);
+    update_speed(&right_wheel);
 
-  // speed PID
-  left_wheel_pidout += PID_Calc(&left_wheel_speed_pid, left_wheel.speed, 0);
-  right_wheel_pidout += PID_Calc(&right_wheel_speed_pid, right_wheel.speed, 0);
+    // stand PID
+    real_angle_setpoint = smooth_setpoint(angle_setpoint, real_angle_setpoint, 0.03);
+    left_wheel_pidout = PID_Calc(&left_wheel_stand_pid, MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
+    right_wheel_pidout = PID_Calc(&right_wheel_stand_pid, MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
 
-  // feedforward
-  if(left_wheel_pidout > 0) {
-    left_wheel_pidout += feedforward;
-  } else if(left_wheel_pidout < 0) {
-    left_wheel_pidout -= feedforward;
-  }
-  if(right_wheel_pidout > 0) {
+    // speed PID
+    real_speed_setpoint = smooth_setpoint(speed_setpoint, real_speed_setpoint, 0.03);
+    left_wheel_pidout += PID_Calc(&left_wheel_speed_pid, left_wheel.speed, real_speed_setpoint);
+    right_wheel_pidout += PID_Calc(&right_wheel_speed_pid, right_wheel.speed, real_speed_setpoint);
+
+    // feedforward
+    if (left_wheel_pidout > 0) {
+      left_wheel_pidout += feedforward;
+    } else if (left_wheel_pidout < 0) {
+      left_wheel_pidout -= feedforward;
+    }
+    if (right_wheel_pidout > 0) {
       right_wheel_pidout += feedforward;
-  } else if(right_wheel_pidout < 0) {
+    } else if (right_wheel_pidout < 0) {
       right_wheel_pidout -= feedforward;
+    }
+    // set speed
+    set_speed(&left_wheel, left_wheel_pidout);
+    set_speed(&right_wheel, right_wheel_pidout);
+    count = 0;
+  } else {
+    count++;
   }
-  // set speed
-  set_speed(&left_wheel, left_wheel_pidout);
-  set_speed(&right_wheel, right_wheel_pidout);
+  /* USER CODE END EXTI15_10_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_12);
+  /* USER CODE BEGIN EXTI15_10_IRQn 1 */
 
-  /* USER CODE END TIM4_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim4);
-  /* USER CODE BEGIN TIM4_IRQn 1 */
-
-  /* USER CODE END TIM4_IRQn 1 */
+  /* USER CODE END EXTI15_10_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
-
+float smooth_setpoint(float setpoint, float current_setpoint, float smooth_factor) {
+  return (setpoint * smooth_factor + current_setpoint * (1 - smooth_factor));
+}
 /* USER CODE END 1 */

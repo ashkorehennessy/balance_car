@@ -13,9 +13,9 @@ typedef struct {
     TIM_HandleTypeDef *encoder_tim;  // wheel encoder TIM
     TIM_HandleTypeDef *pwm_tim;  // wheel PWM TIM
     int pwm_channel;  // wheel PWM TIM channel, connect to L298N motor driver's ENA or ENB
-    GPIO_TypeDef *motorpower1_gpiox;  // L298N motor driver's GPIO INx
+    GPIO_TypeDef *motorpower1_gpio_port;  // L298N motor driver's GPIO INx
     int motorpower1_gpio_pin;  // L298N motor driver's GPIO INx
-    GPIO_TypeDef *motorpower2_gpiox;  // L298N motor driver's GPIO INx
+    GPIO_TypeDef *motorpower2_gpio_port;  // L298N motor driver's GPIO INx
     int motorpower2_gpio_pin;  // L298N motor driver's GPIO INx
     int speed;  // wheel speed
 } WHEEL;
