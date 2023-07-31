@@ -39,7 +39,7 @@ extern "C" {
 /** @defgroup GPIO_Exported_Types GPIO Exported Types
   * @{
   */
-
+#define GPIO_AF4_I2C1      ((uint8_t)0x04)  /* I2C1 Alternate Function mapping     */
 /**
   * @brief GPIO Init structure definition
   */
@@ -56,6 +56,9 @@ typedef struct
 
   uint32_t Speed;     /*!< Specifies the speed for the selected pins.
                            This parameter can be a value of @ref GPIO_speed_define */
+
+    uint32_t Alternate;  /*!< Peripheral to be connected to the selected pins
+                                This parameter can be a value of @ref GPIOEx_Alternate_function_selection */
 } GPIO_InitTypeDef;
 
 /**

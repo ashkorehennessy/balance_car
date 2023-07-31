@@ -123,11 +123,11 @@ int main(void)
   /* Init MPU6050 */
 
   /* Init SSD1306 */
-//  ssd1306_Init();
-//  ssd1306_Fill(Black);
-//  ssd1306_SetCursor(0, 0);
-//  ssd1306_WriteString("MPU6050 OK", Font_11x18, White);
-//  ssd1306_UpdateScreen();
+  ssd1306_Init();
+  ssd1306_Fill(Black);
+  ssd1306_SetCursor(0, 0);
+  ssd1306_WriteString("SSD1306 OK", Font_11x18, White);
+  ssd1306_UpdateScreen();
   /* Init SSD1306 */
 
   /* Init whells */
@@ -178,16 +178,16 @@ int main(void)
   {
 //    sprintf(buf,"speed:%d,%d,%d\r\n",left_wheel.speed,right_wheel.speed,temp);
 //    HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),1000);
-//    sprintf(buf,"%.2f,%.2f,%d,%d,%d,%d\r\n",MPU6050.KalmanAngleX,MPU6050.KalmanAngleY,left_wheel.speed,left_wheel_pidout,right_wheel.speed,right_wheel_pidout);
-//    HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),1000);
-//    HAL_Delay(50);
+    sprintf(buf,"Bluetooth_serial_OK%.2f,%.2f,%d,%d,%d,%d\r\n",MPU6050.KalmanAngleX,MPU6050.KalmanAngleY,left_wheel.speed,left_wheel_pidout,right_wheel.speed,right_wheel_pidout);
+    HAL_UART_Transmit(&huart2,(uint8_t*)buf,strlen(buf),1000);
+    HAL_Delay(50);
     // move forward 5 seconds and backward 5 seconds loop
-    angle_setpoint = -1;
-    speed_setpoint = 10;
-    HAL_Delay(5000);
-    angle_setpoint = 1;
-    speed_setpoint = -10;
-    HAL_Delay(5000);
+//    angle_setpoint = -1;
+//    speed_setpoint = 10;
+//    HAL_Delay(5000);
+//    angle_setpoint = 1;
+//    speed_setpoint = -10;
+//    HAL_Delay(5000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
