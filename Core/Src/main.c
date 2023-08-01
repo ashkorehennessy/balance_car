@@ -25,6 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stdlib.h"
 #include "stdio.h"
 #include "string.h"
 #include "mpu6050.h"
@@ -52,20 +53,21 @@
 
 /* USER CODE BEGIN PV */
 MPU6050_t MPU6050;
-uint8_t MPU6050_OK = 0;
-int temp;
-int pidout;
 WHEEL left_wheel;
 WHEEL right_wheel;
 PID left_wheel_stand_pid;
 PID right_wheel_stand_pid;
 PID left_wheel_speed_pid;
 PID right_wheel_speed_pid;
+PID left_wheel_turn_pid;
+PID right_wheel_turn_pid;
 int left_wheel_pidout;
 int right_wheel_pidout;
 float angle_offset;
+float temp_speed_setpoint;
 float speed_setpoint;
 float angle_setpoint;
+float turn_setpoint;
 uint16_t pwm_max_arr;
 uint16_t feedforward;
 char buf[100];
@@ -74,7 +76,7 @@ char buf[100];
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void show_debug_info();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -151,16 +153,18 @@ int main(void)
   /* Init whells */
 
   pwm_max_arr = __HAL_TIM_GET_AUTORELOAD(&htim1);  // Get PWM max value
-  feedforward = pwm_max_arr * 0.00;  // ???
-  angle_offset = 1.50f;  // angle offset, based on the mpu6050 placement
+  feedforward = pwm_max_arr * 0.05;  // ???
+  angle_offset = 1.00f;  // angle offset, based on the mpu6050 placement
   speed_setpoint = 0;  // speed setpoint
   angle_setpoint = 0;  // angle setpoint
 
   /* Init wheel PID */
   left_wheel_stand_pid = PID_Init(60, 0, 380, pwm_max_arr, -pwm_max_arr);
   right_wheel_stand_pid = PID_Init(60, 0, 380, pwm_max_arr, -pwm_max_arr);
-  left_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr, -pwm_max_arr);
-  right_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr, -pwm_max_arr);
+  left_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr*0.5, -pwm_max_arr*0.5);
+  right_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr*0.5, -pwm_max_arr*0.5);
+  left_wheel_turn_pid = PID_Init(0, 0, 0, pwm_max_arr*0.25, -pwm_max_arr*0.25);
+  right_wheel_turn_pid = PID_Init(0, 0, 0, pwm_max_arr*0.25, -pwm_max_arr*0.25);
   /* Init wheel PID */
 
   /* Timers */
@@ -176,18 +180,41 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//    sprintf(buf,"speed:%d,%d,%d\r\n",left_wheel.speed,right_wheel.speed,temp);
-//    HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),1000);
-    sprintf(buf,"Bluetooth_serial_OK%.2f,%.2f,%d,%d,%d,%d\r\n",MPU6050.KalmanAngleX,MPU6050.KalmanAngleY,left_wheel.speed,left_wheel_pidout,right_wheel.speed,right_wheel_pidout);
-    HAL_UART_Transmit(&huart2,(uint8_t*)buf,strlen(buf),1000);
-    HAL_Delay(50);
-    // move forward 5 seconds and backward 5 seconds loop
-//    angle_setpoint = -1;
-//    speed_setpoint = 10;
-//    HAL_Delay(5000);
-//    angle_setpoint = 1;
-//    speed_setpoint = -10;
-//    HAL_Delay(5000);
+    /*
+     * Receive data from bluetooth serial and process
+     * data format: s-12.00  (will set speed setpoint to -12.00)
+     *             t12.00  (will set turn setpoint to 12.00)
+     */
+    HAL_UART_Receive(&huart2, (uint8_t*)buf, 20, 100);
+    if(buf[0] == 's'){
+      char *speed_buf = buf + 1;
+      temp_speed_setpoint = atoff(speed_buf);
+    }
+    if(buf[0] == 't'){
+      char *turn_buf = buf + 1;
+      turn_setpoint = atoff(turn_buf);
+    }
+    angle_setpoint = temp_speed_setpoint * 0.1f;
+    if(temp_speed_setpoint * turn_setpoint < 0){
+      speed_setpoint = temp_speed_setpoint + turn_setpoint * 0.2f;
+    } else if (temp_speed_setpoint * turn_setpoint > 0){
+      speed_setpoint = temp_speed_setpoint - turn_setpoint * 0.2f;
+    } else {
+      speed_setpoint = temp_speed_setpoint;
+    }
+
+    // disable turn PID when stand still
+    if(turn_setpoint == 0 && speed_setpoint == 0){
+      left_wheel_turn_pid.Kp = 0;
+      right_wheel_turn_pid.Kp = 0;
+    } else {
+      left_wheel_turn_pid.Kp = 6;
+      right_wheel_turn_pid.Kp = 6;
+    }
+
+    show_debug_info();
+    HAL_Delay(100);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -235,6 +262,53 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void show_debug_info(){
+  char ssd1306_buf[20];
+  ssd1306_Fill(Black);
+  ssd1306_SetCursor(0, 0);
+  sprintf(ssd1306_buf, "Speed:%.1f", speed_setpoint);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "Turn:%.1f", turn_setpoint);
+  ssd1306_SetCursor(64, 0);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "l%.0f", left_wheel_stand_pid.last_out);
+  ssd1306_SetCursor(0, 10);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "%.0f", left_wheel_speed_pid.last_out);
+  ssd1306_SetCursor(44, 10);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "%.0f", left_wheel_turn_pid.last_out);
+  ssd1306_SetCursor(86, 10);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "r%.0f", right_wheel_stand_pid.last_out);
+  ssd1306_SetCursor(0, 20);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "%.0f", right_wheel_speed_pid.last_out);
+  ssd1306_SetCursor(44, 20);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "%.0f", right_wheel_turn_pid.last_out);
+  ssd1306_SetCursor(86, 20);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "ls%d", left_wheel.speed);
+  ssd1306_SetCursor(0, 30);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "rs%d", right_wheel.speed);
+  ssd1306_SetCursor(44, 30);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "df%d", left_wheel.speed - right_wheel.speed);
+  ssd1306_SetCursor(86, 30);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "ax%.2f", MPU6050.KalmanAngleX);
+  ssd1306_SetCursor(0, 40);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "ay%.2f", MPU6050.KalmanAngleY);
+  ssd1306_SetCursor(44, 40);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "gz%.2f", MPU6050.Gz - 0.91);
+  ssd1306_SetCursor(86, 40);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  ssd1306_UpdateScreen();
+}
 
 /* USER CODE END 4 */
 

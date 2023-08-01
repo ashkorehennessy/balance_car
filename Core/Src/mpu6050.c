@@ -211,6 +211,13 @@ void MPU6050_Read_All(I2C_HandleTypeDef *I2Cx, MPU6050_t *DataStruct)
   if (fabs(DataStruct->KalmanAngleY) > 90)
     DataStruct->Gx = -DataStruct->Gx;
   DataStruct->KalmanAngleX = Kalman_getAngle(&KalmanX, roll, DataStruct->Gx, dt);
+
+  // smooth Gz
+  DataStruct->Gz = DataStruct->Gz * 0.05 + DataStruct->Old_Gz * 0.95;
+  DataStruct->Old_Gz = DataStruct->Gz;
+
+  // estimate yaw angle
+  DataStruct->AngleZ += (DataStruct->Gz - 0.91) * dt;
 }
 
 double Kalman_getAngle(Kalman_t *Kalman, double newAngle, double newRate, double dt)

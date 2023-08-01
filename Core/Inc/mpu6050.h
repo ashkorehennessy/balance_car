@@ -26,11 +26,13 @@ typedef struct
     double Gx;
     double Gy;
     double Gz;
+    double Old_Gz;
 
     float Temperature;
 
     double KalmanAngleX;
     double KalmanAngleY;
+    double AngleZ;
 } MPU6050_t;
 
 // Kalman structure

@@ -38,5 +38,7 @@ float PID_Calc(PID *pid, float input_value, float setpoint){
       output = pid->outmin;
   }
 
+  pid->last_out = output;
+
   return output;
 }

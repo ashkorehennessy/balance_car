@@ -44,6 +44,7 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
 int count = 0;
+int speed_diff = 0;
 float real_angle_setpoint = 0;
 float real_speed_setpoint = 0;
 /* USER CODE END PV */
@@ -65,17 +66,18 @@ float smooth_setpoint(float setpoint, float current_setpoint, float smooth_facto
 extern WHEEL left_wheel;
 extern WHEEL right_wheel;
 extern MPU6050_t MPU6050;
-extern int temp;
-extern int pidout;
 extern PID left_wheel_stand_pid;
 extern PID right_wheel_stand_pid;
 extern PID left_wheel_speed_pid;
 extern PID right_wheel_speed_pid;
+extern PID left_wheel_turn_pid;
+extern PID right_wheel_turn_pid;
 extern int left_wheel_pidout;
 extern int right_wheel_pidout;
 extern float angle_offset;
 extern float speed_setpoint;
 extern float angle_setpoint;
+extern float turn_setpoint;
 extern uint16_t pwm_max_arr;
 extern uint16_t feedforward;
 /* USER CODE END EV */
@@ -225,20 +227,25 @@ void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
-  if(count == 15) {
+  if(count == 16) {
     MPU6050_Read_All(&hi2c2, &MPU6050);
     update_speed(&left_wheel);
     update_speed(&right_wheel);
 
     // stand PID
-    real_angle_setpoint = smooth_setpoint(angle_setpoint, real_angle_setpoint, 0.03);
+    real_angle_setpoint = smooth_setpoint(angle_setpoint, real_angle_setpoint, 0.02f);
     left_wheel_pidout = PID_Calc(&left_wheel_stand_pid, MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
     right_wheel_pidout = PID_Calc(&right_wheel_stand_pid, MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
 
     // speed PID
-    real_speed_setpoint = smooth_setpoint(speed_setpoint, real_speed_setpoint, 0.03);
+    real_speed_setpoint = smooth_setpoint(speed_setpoint, real_speed_setpoint, 0.02f);
     left_wheel_pidout += PID_Calc(&left_wheel_speed_pid, left_wheel.speed, real_speed_setpoint);
     right_wheel_pidout += PID_Calc(&right_wheel_speed_pid, right_wheel.speed, real_speed_setpoint);
+
+    // turn PID
+    speed_diff = left_wheel.speed - right_wheel.speed;
+    left_wheel_pidout += PID_Calc(&left_wheel_turn_pid, speed_diff, turn_setpoint);
+    right_wheel_pidout -= PID_Calc(&right_wheel_turn_pid, speed_diff, turn_setpoint);
 
     // feedforward
     if (left_wheel_pidout > 0) {
