@@ -76,7 +76,6 @@ char buf[100];
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void show_debug_info();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -153,16 +152,16 @@ int main(void)
   /* Init whells */
 
   pwm_max_arr = __HAL_TIM_GET_AUTORELOAD(&htim1);  // Get PWM max value
-  feedforward = pwm_max_arr * 0.05;  // ???
-  angle_offset = 1.00f;  // angle offset, based on the mpu6050 placement
+  feedforward = pwm_max_arr * 0.00;  // ???
+  angle_offset = -2.00f;  // angle offset, based on the mpu6050 placement
   speed_setpoint = 0;  // speed setpoint
   angle_setpoint = 0;  // angle setpoint
 
   /* Init wheel PID */
-  left_wheel_stand_pid = PID_Init(60, 0, 380, pwm_max_arr, -pwm_max_arr);
-  right_wheel_stand_pid = PID_Init(60, 0, 380, pwm_max_arr, -pwm_max_arr);
-  left_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr*0.5, -pwm_max_arr*0.5);
-  right_wheel_speed_pid = PID_Init(-25, -0.1f, 0, pwm_max_arr*0.5, -pwm_max_arr*0.5);
+  left_wheel_stand_pid = PID_Init(43, 0, 200, 65535, -65535);
+  right_wheel_stand_pid = PID_Init(43, 0, 200, 65535, -65535);
+  left_wheel_speed_pid = PID_Init(-39, 0, 0, 65535, -65535);
+  right_wheel_speed_pid = PID_Init(-39, 0, 0, 65535, -65535);
   left_wheel_turn_pid = PID_Init(0, 0, 0, pwm_max_arr*0.25, -pwm_max_arr*0.25);
   right_wheel_turn_pid = PID_Init(0, 0, 0, pwm_max_arr*0.25, -pwm_max_arr*0.25);
   /* Init wheel PID */
@@ -196,9 +195,9 @@ int main(void)
     }
     angle_setpoint = temp_speed_setpoint * 0.1f;
     if(temp_speed_setpoint * turn_setpoint < 0){
-      speed_setpoint = temp_speed_setpoint + turn_setpoint * 0.2f;
+      speed_setpoint = temp_speed_setpoint + turn_setpoint * 0.03f;
     } else if (temp_speed_setpoint * turn_setpoint > 0){
-      speed_setpoint = temp_speed_setpoint - turn_setpoint * 0.2f;
+      speed_setpoint = temp_speed_setpoint - turn_setpoint * 0.03f;
     } else {
       speed_setpoint = temp_speed_setpoint;
     }
@@ -211,6 +210,31 @@ int main(void)
       left_wheel_turn_pid.Kp = 6;
       right_wheel_turn_pid.Kp = 6;
     }
+
+    // if angle not a number, reset system
+    if(is_nan(MPU6050.KalmanAngleX)){
+      NVIC_SystemReset();
+    }
+
+    // re-stand when fall
+    if(MPU6050.KalmanAngleX > 45){
+      HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+      set_speed(&left_wheel, 600);
+      set_speed(&right_wheel, 600);
+      HAL_Delay(700);
+      HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+      HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+      HAL_Delay(1000);
+    } else if (MPU6050.KalmanAngleX < -45){
+      HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+      set_speed(&left_wheel, -600);
+      set_speed(&right_wheel, -600);
+      HAL_Delay(700);
+      HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+      HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+      HAL_Delay(1000);
+    }
+
 
     show_debug_info();
     HAL_Delay(100);
@@ -310,6 +334,9 @@ void show_debug_info(){
   ssd1306_UpdateScreen();
 }
 
+uint8_t is_nan(double x){
+  return x != x;
+}
 /* USER CODE END 4 */
 
 /**

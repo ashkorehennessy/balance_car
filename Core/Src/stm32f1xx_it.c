@@ -226,8 +226,10 @@ void SysTick_Handler(void)
 void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
-
-  if(count == 16) {
+#define USE_COUNTER
+#ifdef USE_COUNTER
+  if(count == 15) {
+#endif
     MPU6050_Read_All(&hi2c2, &MPU6050);
     update_speed(&left_wheel);
     update_speed(&right_wheel);
@@ -240,7 +242,7 @@ void EXTI15_10_IRQHandler(void)
     // speed PID
     real_speed_setpoint = smooth_setpoint(speed_setpoint, real_speed_setpoint, 0.02f);
     left_wheel_pidout += PID_Calc(&left_wheel_speed_pid, left_wheel.speed, real_speed_setpoint);
-    right_wheel_pidout += PID_Calc(&right_wheel_speed_pid, right_wheel.speed, real_speed_setpoint);
+    right_wheel_pidout += PID_Calc(&right_wheel_speed_pid, left_wheel.speed, real_speed_setpoint);
 
     // turn PID
     speed_diff = left_wheel.speed - right_wheel.speed;
@@ -261,10 +263,12 @@ void EXTI15_10_IRQHandler(void)
     // set speed
     set_speed(&left_wheel, left_wheel_pidout);
     set_speed(&right_wheel, right_wheel_pidout);
+#ifdef USE_COUNTER
     count = 0;
   } else {
     count++;
   }
+#endif
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_12);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
