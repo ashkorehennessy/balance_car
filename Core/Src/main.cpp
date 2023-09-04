@@ -17,6 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <cstdio>
 #include "main.h"
 #include "i2c.h"
 #include "tim.h"
@@ -25,14 +26,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdlib.h"
-#include "stdio.h"
-#include "string.h"
-#include "mpu6050.h"
-#include "ssd1306.h"
-#include "ssd1306_fonts.h"
 #include "wheel.h"
-#include "pid.h"
+#include "PID.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,14 +48,15 @@
 
 /* USER CODE BEGIN PV */
 MPU6050_t MPU6050;
-WHEEL left_wheel;
-WHEEL right_wheel;
-PID left_wheel_stand_pid;
-PID right_wheel_stand_pid;
-PID left_wheel_speed_pid;
-PID right_wheel_speed_pid;
-PID left_wheel_turn_pid;
-PID right_wheel_turn_pid;
+Wheel left_wheel(&htim2, &htim1, TIM_CHANNEL_1, GPIOB, GPIO_PIN_14, GPIOB, GPIO_PIN_15);
+Wheel right_wheel(&htim3, &htim1, TIM_CHANNEL_4, GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_12);
+
+PID left_wheel_stand_pid(43, 0, 200, 65535, -65535);
+PID right_wheel_stand_pid(43, 0, 200, 65535, -65535);
+PID left_wheel_speed_pid(-39, 0, 0, 65535, -65535);
+PID right_wheel_speed_pid(-39, 0, 0, 65535, -65535);
+PID left_wheel_turn_pid(0, 0, 0, 1000, -1000);
+PID right_wheel_turn_pid(0, 0, 0, 1000, -1000);
 int left_wheel_pidout;
 int right_wheel_pidout;
 float angle_offset;
@@ -131,40 +127,11 @@ int main(void)
   ssd1306_UpdateScreen();
   /* Init SSD1306 */
 
-  /* Init whells */
-  left_wheel.encoder_tim = &htim2;
-  left_wheel.pwm_tim = &htim1;
-  left_wheel.pwm_channel = TIM_CHANNEL_1;
-  left_wheel.motorpower1_gpio_port = GPIOB;
-  left_wheel.motorpower1_gpio_pin = GPIO_PIN_14;
-  left_wheel.motorpower2_gpio_port = GPIOB;
-  left_wheel.motorpower2_gpio_pin = GPIO_PIN_15;
-  left_wheel.speed = 0;
-
-  right_wheel.encoder_tim = &htim3;
-  right_wheel.pwm_tim = &htim1;
-  right_wheel.pwm_channel = TIM_CHANNEL_4;
-  right_wheel.motorpower1_gpio_port = GPIOB;
-  right_wheel.motorpower1_gpio_pin = GPIO_PIN_13;
-  right_wheel.motorpower2_gpio_port = GPIOB;
-  right_wheel.motorpower2_gpio_pin = GPIO_PIN_12;
-  right_wheel.speed = 0;
-  /* Init whells */
-
   pwm_max_arr = __HAL_TIM_GET_AUTORELOAD(&htim1);  // Get PWM max value
   feedforward = pwm_max_arr * 0.00;  // ???
-  angle_offset = -2.00f;  // angle offset, based on the mpu6050 placement
+  angle_offset = 1.5f;  // angle offset, based on the mpu6050 placement
   speed_setpoint = 0;  // speed setpoint
   angle_setpoint = 0;  // angle setpoint
-
-  /* Init wheel PID */
-  left_wheel_stand_pid = PID_Init(43, 0, 200, 65535, -65535);
-  right_wheel_stand_pid = PID_Init(43, 0, 200, 65535, -65535);
-  left_wheel_speed_pid = PID_Init(-39, 0, 0, 65535, -65535);
-  right_wheel_speed_pid = PID_Init(-39, 0, 0, 65535, -65535);
-  left_wheel_turn_pid = PID_Init(0, 0, 0, pwm_max_arr*0.25, -pwm_max_arr*0.25);
-  right_wheel_turn_pid = PID_Init(0, 0, 0, pwm_max_arr*0.25, -pwm_max_arr*0.25);
-  /* Init wheel PID */
 
   /* Timers */
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
@@ -219,16 +186,16 @@ int main(void)
     // re-stand when fall
     if(MPU6050.KalmanAngleX > 45){
       HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-      set_speed(&left_wheel, 600);
-      set_speed(&right_wheel, 600);
+      left_wheel.set_speed(600);
+      right_wheel.set_speed(600);
       HAL_Delay(700);
       HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
       HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
       HAL_Delay(1000);
     } else if (MPU6050.KalmanAngleX < -45){
       HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-      set_speed(&left_wheel, -600);
-      set_speed(&right_wheel, -600);
+      left_wheel.set_speed(-600);
+      right_wheel.set_speed(-600);
       HAL_Delay(700);
       HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
       HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -337,6 +304,51 @@ void show_debug_info(){
 uint8_t is_nan(double x){
   return x != x;
 }
+
+float atoff(char *str){
+  float result = 0;
+  float decimal = 0;
+  int i = 0;
+  int sign = 1;
+  if(str[0] == '-'){
+    sign = -1;
+    i++;
+  }
+  while(str[i] != '\0'){
+    if(str[i] == '.'){
+      decimal = 1;
+      i++;
+      continue;
+    }
+    if(decimal == 0){
+      result = result * 10 + str[i] - '0';
+    } else {
+      result = result + (str[i] - '0') * pow(10, -decimal);
+      decimal++;
+    }
+    i++;
+  }
+  return result * sign;
+}
+
+double pow(double x, int y){
+  double result = 1;
+  if(y == 0){
+    return 1;
+  }
+  if(y > 0){
+    for(int i = 0; i < y; i++){
+      result *= x;
+    }
+  } else {
+    for(int i = 0; i < -y; i++){
+      result /= x;
+    }
+  }
+  return result;
+}
+
+
 /* USER CODE END 4 */
 
 /**

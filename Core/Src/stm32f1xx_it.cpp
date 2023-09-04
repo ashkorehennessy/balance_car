@@ -23,8 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "wheel.h"
-#include "mpu6050.h"
-#include "pid.h"
+#include "PID.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,8 +62,8 @@ float smooth_setpoint(float setpoint, float current_setpoint, float smooth_facto
 /* External variables --------------------------------------------------------*/
 
 /* USER CODE BEGIN EV */
-extern WHEEL left_wheel;
-extern WHEEL right_wheel;
+extern Wheel left_wheel;
+extern Wheel right_wheel;
 extern MPU6050_t MPU6050;
 extern PID left_wheel_stand_pid;
 extern PID right_wheel_stand_pid;
@@ -231,23 +230,23 @@ void EXTI15_10_IRQHandler(void)
   if(count == 15) {
 #endif
     MPU6050_Read_All(&hi2c2, &MPU6050);
-    update_speed(&left_wheel);
-    update_speed(&right_wheel);
+    left_wheel.update_speed();
+    right_wheel.update_speed();
 
     // stand PID
     real_angle_setpoint = smooth_setpoint(angle_setpoint, real_angle_setpoint, 0.02f);
-    left_wheel_pidout = PID_Calc(&left_wheel_stand_pid, MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
-    right_wheel_pidout = PID_Calc(&right_wheel_stand_pid, MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
+    left_wheel_pidout = left_wheel_stand_pid.calc(MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
+    right_wheel_pidout = right_wheel_stand_pid.calc(MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
 
     // speed PID
     real_speed_setpoint = smooth_setpoint(speed_setpoint, real_speed_setpoint, 0.02f);
-    left_wheel_pidout += PID_Calc(&left_wheel_speed_pid, left_wheel.speed, real_speed_setpoint);
-    right_wheel_pidout += PID_Calc(&right_wheel_speed_pid, left_wheel.speed, real_speed_setpoint);
+    left_wheel_pidout += left_wheel_speed_pid.calc(left_wheel.speed, real_speed_setpoint);
+    right_wheel_pidout += right_wheel_speed_pid.calc(left_wheel.speed, real_speed_setpoint);
 
     // turn PID
     speed_diff = left_wheel.speed - right_wheel.speed;
-    left_wheel_pidout += PID_Calc(&left_wheel_turn_pid, speed_diff, turn_setpoint);
-    right_wheel_pidout -= PID_Calc(&right_wheel_turn_pid, speed_diff, turn_setpoint);
+    left_wheel_pidout += left_wheel_turn_pid.calc(speed_diff, turn_setpoint);
+    right_wheel_pidout -= right_wheel_turn_pid.calc(speed_diff, turn_setpoint);
 
     // feedforward
     if (left_wheel_pidout > 0) {
@@ -261,8 +260,8 @@ void EXTI15_10_IRQHandler(void)
       right_wheel_pidout -= feedforward;
     }
     // set speed
-    set_speed(&left_wheel, left_wheel_pidout);
-    set_speed(&right_wheel, right_wheel_pidout);
+    left_wheel.set_speed(left_wheel_pidout);
+    right_wheel.set_speed(right_wheel_pidout);
 #ifdef USE_COUNTER
     count = 0;
   } else {

@@ -32,6 +32,9 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "mpu6050.h"
+#include "ssd1306.h"
+#include "ssd1306_fonts.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -55,6 +58,8 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 uint8_t is_nan(double x);
 void show_debug_info();
+float atoff(char *s);
+double pow(double x, int y);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
