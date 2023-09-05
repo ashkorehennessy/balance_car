@@ -23,10 +23,10 @@ float PID::calc(float input_value, float setpoint) {
     float output = this->Kp * error + this->Ki * this->integral + this->Kd * derivative;
 
     // Integral limit
-    if (this->integral > this->outmax) {
-        this->integral = this->outmax;
-    } else if (this->integral < this->outmin) {
-        this->integral = this->outmin;
+    if (this->integral > this->outmax / 100) {
+        this->integral = this->outmax / 100;
+    } else if (this->integral < this->outmin / 100) {
+        this->integral = this->outmin / 100;
     }
 
     // Output limit

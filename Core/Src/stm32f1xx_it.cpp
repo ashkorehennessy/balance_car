@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "wheel.h"
 #include "PID.h"
+#include "sr04.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,11 +61,12 @@ float smooth_setpoint(float setpoint, float current_setpoint, float smooth_facto
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-
+extern TIM_HandleTypeDef htim1;
 /* USER CODE BEGIN EV */
 extern Wheel left_wheel;
 extern Wheel right_wheel;
 extern MPU6050_t MPU6050;
+extern SR04 sr04;
 extern PID left_wheel_stand_pid;
 extern PID right_wheel_stand_pid;
 extern PID left_wheel_speed_pid;
@@ -218,6 +220,20 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f1xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles TIM1 capture compare interrupt.
+  */
+void TIM1_CC_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM1_CC_IRQn 0 */
+  sr04.read_distance();
+  /* USER CODE END TIM1_CC_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim1);
+  /* USER CODE BEGIN TIM1_CC_IRQn 1 */
+
+  /* USER CODE END TIM1_CC_IRQn 1 */
+}
 
 /**
   * @brief This function handles EXTI line[15:10] interrupts.

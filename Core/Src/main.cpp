@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <cstdio>
 #include "main.h"
 #include "i2c.h"
 #include "tim.h"
@@ -28,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 #include "wheel.h"
 #include "PID.h"
+#include "sr04.h"
+#include "cstdio"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,13 +49,14 @@
 
 /* USER CODE BEGIN PV */
 MPU6050_t MPU6050;
+SR04 sr04(GPIOA, GPIO_PIN_10, &htim1, TIM_CHANNEL_2);
 Wheel left_wheel(&htim2, &htim1, TIM_CHANNEL_1, GPIOB, GPIO_PIN_14, GPIOB, GPIO_PIN_15);
 Wheel right_wheel(&htim3, &htim1, TIM_CHANNEL_4, GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_12);
 
-PID left_wheel_stand_pid(43, 0, 200, 65535, -65535);
-PID right_wheel_stand_pid(43, 0, 200, 65535, -65535);
-PID left_wheel_speed_pid(-39, 0, 0, 65535, -65535);
-PID right_wheel_speed_pid(-39, 0, 0, 65535, -65535);
+PID left_wheel_stand_pid(240, 0, 1000, 65535, -65535);
+PID right_wheel_stand_pid(240, 0, 1000, 65535, -65535);
+PID left_wheel_speed_pid(-200, -1, 0, 65535, -65535);
+PID right_wheel_speed_pid(-200, -1, 0, 65535, -65535);
 PID left_wheel_turn_pid(0, 0, 0, 1000, -1000);
 PID right_wheel_turn_pid(0, 0, 0, 1000, -1000);
 int left_wheel_pidout;
@@ -107,12 +109,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
-  MX_USART1_UART_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_I2C2_Init();
   MX_TIM1_Init();
   MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* Init MPU6050 */
@@ -139,6 +141,8 @@ int main(void)
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
   /* Timers */
+
+  sr04.init();
 
   /* USER CODE END 2 */
 
@@ -186,16 +190,16 @@ int main(void)
     // re-stand when fall
     if(MPU6050.KalmanAngleX > 45){
       HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-      left_wheel.set_speed(600);
-      right_wheel.set_speed(600);
+      left_wheel.set_speed(3000);
+      right_wheel.set_speed(3000);
       HAL_Delay(700);
       HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
       HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
       HAL_Delay(1000);
     } else if (MPU6050.KalmanAngleX < -45){
       HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-      left_wheel.set_speed(-600);
-      right_wheel.set_speed(-600);
+      left_wheel.set_speed(-3000);
+      right_wheel.set_speed(-3000);
       HAL_Delay(700);
       HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
       HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -204,6 +208,7 @@ int main(void)
 
 
     show_debug_info();
+    sr04.trigger();
     HAL_Delay(100);
 
     /* USER CODE END WHILE */
@@ -297,6 +302,9 @@ void show_debug_info(){
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
   sprintf(ssd1306_buf, "gz%.2f", MPU6050.Gz - 0.91);
   ssd1306_SetCursor(86, 40);
+  ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  sprintf(ssd1306_buf, "ds%lu", sr04.distance);
+  ssd1306_SetCursor(0, 50);
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
   ssd1306_UpdateScreen();
 }
