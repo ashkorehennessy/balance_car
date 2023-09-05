@@ -69,6 +69,8 @@ float turn_setpoint;
 uint16_t pwm_max_arr;
 uint16_t feedforward;
 char buf[100];
+uint8_t avoidance_counter = 0;
+int update_count = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -155,23 +157,23 @@ int main(void)
      * data format: s-12.00  (will set speed setpoint to -12.00)
      *             t12.00  (will set turn setpoint to 12.00)
      */
-    HAL_UART_Receive(&huart2, (uint8_t*)buf, 20, 100);
-    if(buf[0] == 's'){
-      char *speed_buf = buf + 1;
-      temp_speed_setpoint = atoff(speed_buf);
-    }
-    if(buf[0] == 't'){
-      char *turn_buf = buf + 1;
-      turn_setpoint = atoff(turn_buf);
-    }
-    angle_setpoint = temp_speed_setpoint * 0.1f;
-    if(temp_speed_setpoint * turn_setpoint < 0){
-      speed_setpoint = temp_speed_setpoint + turn_setpoint * 0.03f;
-    } else if (temp_speed_setpoint * turn_setpoint > 0){
-      speed_setpoint = temp_speed_setpoint - turn_setpoint * 0.03f;
-    } else {
-      speed_setpoint = temp_speed_setpoint;
-    }
+//    HAL_UART_Receive(&huart2, (uint8_t*)buf, 20, 100);
+//    if(buf[0] == 's'){
+//      char *speed_buf = buf + 1;
+//      temp_speed_setpoint = atoff(speed_buf);
+//    }
+//    if(buf[0] == 't'){
+//      char *turn_buf = buf + 1;
+//      turn_setpoint = atoff(turn_buf);
+//    }
+//    angle_setpoint = temp_speed_setpoint * 0.1f;
+//    if(temp_speed_setpoint * turn_setpoint < 0){
+//      speed_setpoint = temp_speed_setpoint + turn_setpoint * 0.03f;
+//    } else if (temp_speed_setpoint * turn_setpoint > 0){
+//      speed_setpoint = temp_speed_setpoint - turn_setpoint * 0.03f;
+//    } else {
+//      speed_setpoint = temp_speed_setpoint;
+//    }
 
     // disable turn PID when stand still
     if(turn_setpoint == 0 && speed_setpoint == 0){
@@ -204,6 +206,22 @@ int main(void)
       HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
       HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
       HAL_Delay(1000);
+    }
+
+    if(sr04.distance < 500){
+      avoidance_counter = 40;
+    }
+    if(avoidance_counter > 0){
+      if(avoidance_counter > 25) {
+        speed_setpoint = -10;
+        turn_setpoint = 20;
+      } else {
+        speed_setpoint = 10;
+      }
+      avoidance_counter--;
+    } else {
+      speed_setpoint = 8;
+      turn_setpoint = 0;
     }
 
 

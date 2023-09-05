@@ -81,6 +81,7 @@ extern float angle_setpoint;
 extern float turn_setpoint;
 extern uint16_t pwm_max_arr;
 extern uint16_t feedforward;
+extern int update_count;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -222,6 +223,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles TIM1 update interrupt.
+  */
+void TIM1_UP_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM1_UP_IRQn 0 */
+  sr04.tim_update_count++;
+  /* USER CODE END TIM1_UP_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim1);
+  /* USER CODE BEGIN TIM1_UP_IRQn 1 */
+
+  /* USER CODE END TIM1_UP_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM1 capture compare interrupt.
   */
 void TIM1_CC_IRQHandler(void)
@@ -266,14 +281,14 @@ void EXTI15_10_IRQHandler(void)
 
     // feedforward
     if (left_wheel_pidout > 0) {
-      left_wheel_pidout += feedforward;
+        left_wheel_pidout += feedforward;
     } else if (left_wheel_pidout < 0) {
-      left_wheel_pidout -= feedforward;
+        left_wheel_pidout -= feedforward;
     }
     if (right_wheel_pidout > 0) {
-      right_wheel_pidout += feedforward;
+        right_wheel_pidout += feedforward;
     } else if (right_wheel_pidout < 0) {
-      right_wheel_pidout -= feedforward;
+        right_wheel_pidout -= feedforward;
     }
     // set speed
     left_wheel.set_speed(left_wheel_pidout);

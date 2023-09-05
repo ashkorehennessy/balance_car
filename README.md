@@ -8,4 +8,4 @@
 - [x] turn left and right
 - [x] add bluetooth control
 - [ ] black line tracking
-- [ ] obstacle avoidance
+- [x] obstacle avoidance

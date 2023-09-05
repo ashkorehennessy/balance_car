@@ -24,10 +24,9 @@ public:
 
     void read_distance();  // This function should be called in the timer input capture callback
 
-    uint32_t get_distance();
-
     uint32_t distance;  // Distance in mm
 
+    uint16_t tim_update_count;  // Timer update count
 };
 
 #endif //SR04_SR04_H
