@@ -4,11 +4,12 @@
 
 #include "sr04.h"
 
-SR04::SR04(GPIO_TypeDef *trig_port, uint16_t trig_pin, TIM_HandleTypeDef *echo_htim, uint16_t echo_channel) {
+SR04::SR04(GPIO_TypeDef *trig_port, uint16_t trig_pin, TIM_HandleTypeDef *echo_htim, uint16_t echo_channel, uint16_t sound_speed) {
     this->trig_port = trig_port;
     this->trig_pin = trig_pin;
     this->echo_htim = echo_htim;
     this->echo_channel = echo_channel;
+    this->sound_speed = sound_speed;
     this->distance = 0;
     this->capture_flag = 0;
     this->tim_update_count = 0;
@@ -33,7 +34,7 @@ void SR04::trigger() {
     HAL_GPIO_WritePin(this->trig_port, this->trig_pin, GPIO_PIN_RESET);
 }
 
-void SR04::read_distance() {
+void SR04::measure_distance() {
     // This function should be called in the timer input capture callback
     static uint32_t start_counter;
     static uint32_t end_counter;
@@ -48,7 +49,7 @@ void SR04::read_distance() {
             end_counter = __HAL_TIM_GET_COUNTER(this->echo_htim) + this->tim_update_count * this->echo_htim->Init.Period;
             this->capture_flag = 0;
             // Calculate distance in mm
-            this->distance = (end_counter - start_counter) * 340 / (SystemCoreClock / 1000000) / 2 /
+            this->distance = (end_counter - start_counter) * this->sound_speed / 2 /(SystemCoreClock / 1000000) /
                               (1000 / this->echo_htim->Init.Prescaler);
             __HAL_TIM_SET_CAPTUREPOLARITY(this->echo_htim, this->echo_channel, TIM_INPUTCHANNELPOLARITY_RISING);
             break;

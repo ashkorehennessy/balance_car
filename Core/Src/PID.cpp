@@ -4,7 +4,7 @@
 
 #include "PID.h"
 
-PID::PID(float Kp, float Ki, float Kd, float outmax, float outmin) {
+PID::PID(float Kp, float Ki, float Kd, float outmax, float outmin, uint8_t use_lowpass_filter, float lowpass_filter_factor) {
     this->Kp = Kp;
     this->Ki = Ki;
     this->Kd = Kd;
@@ -13,6 +13,8 @@ PID::PID(float Kp, float Ki, float Kd, float outmax, float outmin) {
     this->integral = 0;
     this->outmax = outmax;
     this->outmin = outmin;
+    this->use_lowpass_filter = use_lowpass_filter;
+    this->lowpass_filter_factor = lowpass_filter_factor;
 }
 
 float PID::calc(float input_value, float setpoint) {
@@ -34,6 +36,11 @@ float PID::calc(float input_value, float setpoint) {
         output = this->outmax;
     } else if (output < this->outmin) {
         output = this->outmin;
+    }
+
+    // Low pass filter
+    if (this->use_lowpass_filter) {
+        output = this->last_out * this->lowpass_filter_factor + output * (1 - this->lowpass_filter_factor);
     }
 
     this->last_out = output;

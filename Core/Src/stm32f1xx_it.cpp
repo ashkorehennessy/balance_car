@@ -47,6 +47,7 @@ int count = 0;
 int speed_diff = 0;
 float real_angle_setpoint = 0;
 float real_speed_setpoint = 0;
+float real_turn_setpoint = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -79,7 +80,6 @@ extern float angle_offset;
 extern float speed_setpoint;
 extern float angle_setpoint;
 extern float turn_setpoint;
-extern uint16_t pwm_max_arr;
 extern uint16_t feedforward;
 extern int update_count;
 /* USER CODE END EV */
@@ -242,7 +242,7 @@ void TIM1_UP_IRQHandler(void)
 void TIM1_CC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_CC_IRQn 0 */
-  sr04.read_distance();
+  sr04.measure_distance();
   /* USER CODE END TIM1_CC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim1);
   /* USER CODE BEGIN TIM1_CC_IRQn 1 */
@@ -276,8 +276,11 @@ void EXTI15_10_IRQHandler(void)
 
     // turn PID
     speed_diff = left_wheel.speed - right_wheel.speed;
+    real_turn_setpoint = smooth_setpoint(turn_setpoint, real_turn_setpoint, 0.02f);
     left_wheel_pidout += left_wheel_turn_pid.calc(speed_diff, turn_setpoint);
+    left_wheel_pidout += left_wheel_turn_pid.calc(MPU6050.Gz - 0.91, real_turn_setpoint);
     right_wheel_pidout -= right_wheel_turn_pid.calc(speed_diff, turn_setpoint);
+    right_wheel_pidout -= right_wheel_turn_pid.calc(MPU6050.Gz - 0.91, real_turn_setpoint);
 
     // feedforward
     if (left_wheel_pidout > 0) {
@@ -290,6 +293,7 @@ void EXTI15_10_IRQHandler(void)
     } else if (right_wheel_pidout < 0) {
         right_wheel_pidout -= feedforward;
     }
+
     // set speed
     left_wheel.set_speed(left_wheel_pidout);
     right_wheel.set_speed(right_wheel_pidout);

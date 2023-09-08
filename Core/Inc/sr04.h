@@ -15,18 +15,20 @@ private:
     TIM_HandleTypeDef *echo_htim;  // Echo pin timer
     uint16_t echo_channel;  // Echo pin timer channel
     uint8_t capture_flag;  // Echo pin capture flag
-public:
-    SR04(GPIO_TypeDef *trig_port, uint16_t trig_pin, TIM_HandleTypeDef *echo_htim, uint16_t echo_channel);
-
-    void init();
-
-    void trigger();
-
-    void read_distance();  // This function should be called in the timer input capture callback
-
     uint32_t distance;  // Distance in mm
+    uint16_t sound_speed;  // Sound speed in m/s
+public:
+    SR04(GPIO_TypeDef *trig_port, uint16_t trig_pin, TIM_HandleTypeDef *echo_htim, uint16_t echo_channel, uint16_t sound_speed=340);
 
-    uint16_t tim_update_count;  // Timer update count
+    void init();  // Initialize SR04 and timer
+
+    void trigger();  // Send trigger pulse
+
+    void measure_distance();  // Measure distance and update distance variable
+
+    [[nodiscard]] uint32_t get_distance() const { return this->distance;}  // Get distance in mm
+
+    uint16_t tim_update_count;  // Timer update count for calibration distance
 };
 
 #endif //SR04_SR04_H

@@ -50,15 +50,14 @@
 /* USER CODE BEGIN PV */
 MPU6050_t MPU6050;
 SR04 sr04(GPIOA, GPIO_PIN_10, &htim1, TIM_CHANNEL_2);
-Wheel left_wheel(&htim2, &htim1, TIM_CHANNEL_1, GPIOB, GPIO_PIN_14, GPIOB, GPIO_PIN_15);
+Wheel left_wheel(&htim2, &htim1, TIM_CHANNEL_1, GPIOB, GPIO_PIN_15, GPIOB, GPIO_PIN_14);
 Wheel right_wheel(&htim3, &htim1, TIM_CHANNEL_4, GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_12);
-
 PID left_wheel_stand_pid(240, 0, 1000, 65535, -65535);
 PID right_wheel_stand_pid(240, 0, 1000, 65535, -65535);
-PID left_wheel_speed_pid(-200, -1, 0, 65535, -65535);
-PID right_wheel_speed_pid(-200, -1, 0, 65535, -65535);
-PID left_wheel_turn_pid(0, 0, 0, 1000, -1000);
-PID right_wheel_turn_pid(0, 0, 0, 1000, -1000);
+PID left_wheel_speed_pid(-250, 0, 0, 65535, -65535, true, 0.3f);
+PID right_wheel_speed_pid(-250, 0, 0, 65535, -65535, true, 0.3f);
+PID left_wheel_turn_pid(0, 0, 0, 65535, -65535, true, 0.5f);
+PID right_wheel_turn_pid(0, 0, 0, 65535, -65535, true, 0.5f);
 int left_wheel_pidout;
 int right_wheel_pidout;
 float angle_offset;
@@ -69,6 +68,7 @@ float turn_setpoint;
 uint16_t pwm_max_arr;
 uint16_t feedforward;
 char buf[100];
+uint8_t flag_avoidance_mode = 0;
 uint8_t avoidance_counter = 0;
 int update_count = 0;
 /* USER CODE END PV */
@@ -131,9 +131,8 @@ int main(void)
   ssd1306_UpdateScreen();
   /* Init SSD1306 */
 
-  pwm_max_arr = __HAL_TIM_GET_AUTORELOAD(&htim1);  // Get PWM max value
-  feedforward = pwm_max_arr * 0.00;  // ???
-  angle_offset = 1.5f;  // angle offset, based on the mpu6050 placement
+  feedforward = pwm_max_arr * 0.05f;  // ???
+  angle_offset = 0.00f;  // angle offset, based on the mpu6050 placement
   speed_setpoint = 0;  // speed setpoint
   angle_setpoint = 0;  // angle setpoint
 
@@ -157,31 +156,52 @@ int main(void)
      * data format: s-12.00  (will set speed setpoint to -12.00)
      *             t12.00  (will set turn setpoint to 12.00)
      */
-//    HAL_UART_Receive(&huart2, (uint8_t*)buf, 20, 100);
-//    if(buf[0] == 's'){
-//      char *speed_buf = buf + 1;
-//      temp_speed_setpoint = atoff(speed_buf);
-//    }
-//    if(buf[0] == 't'){
-//      char *turn_buf = buf + 1;
-//      turn_setpoint = atoff(turn_buf);
-//    }
-//    angle_setpoint = temp_speed_setpoint * 0.1f;
-//    if(temp_speed_setpoint * turn_setpoint < 0){
-//      speed_setpoint = temp_speed_setpoint + turn_setpoint * 0.03f;
-//    } else if (temp_speed_setpoint * turn_setpoint > 0){
-//      speed_setpoint = temp_speed_setpoint - turn_setpoint * 0.03f;
-//    } else {
-//      speed_setpoint = temp_speed_setpoint;
-//    }
+    HAL_UART_Receive(&huart2, (uint8_t*)buf, 20, 100);
+    if(buf[0] == 's'){
+      char *speed_buf = buf + 1;
+      temp_speed_setpoint = atoff(speed_buf);
+    }
+    if(buf[0] == 't'){
+      char *turn_buf = buf + 1;
+      turn_setpoint = atoff(turn_buf);
+    }
+    if(buf[0] == 'a'){
+      if(flag_avoidance_mode == 0){
+        flag_avoidance_mode = 1;
+        for(int i = 0; i < 20; i++){
+          buf[i] = 0;
+        }
+        speed_setpoint = 8;
+        turn_setpoint = 0;
+      } else {
+        flag_avoidance_mode = 0;
+        for(int i = 0; i < 20; i++){
+          buf[i] = 0;
+        }
+        speed_setpoint = 0;
+        turn_setpoint = 0;
+      }
+    }
+
+    // bluetooch serial control
+    if(flag_avoidance_mode == 0){
+      angle_setpoint = temp_speed_setpoint * 0.2f;
+//      if (temp_speed_setpoint * turn_setpoint < 0) {
+//        speed_setpoint = temp_speed_setpoint + turn_setpoint * 0.03f;
+//      } else if (temp_speed_setpoint * turn_setpoint > 0) {
+//        speed_setpoint = temp_speed_setpoint - turn_setpoint * 0.03f;
+//      } else {
+        speed_setpoint = temp_speed_setpoint;
+//      }
+    }
 
     // disable turn PID when stand still
     if(turn_setpoint == 0 && speed_setpoint == 0){
       left_wheel_turn_pid.Kp = 0;
       right_wheel_turn_pid.Kp = 0;
     } else {
-      left_wheel_turn_pid.Kp = 6;
-      right_wheel_turn_pid.Kp = 6;
+      left_wheel_turn_pid.Kp = 30;
+      right_wheel_turn_pid.Kp = 30;
     }
 
     // if angle not a number, reset system
@@ -208,26 +228,28 @@ int main(void)
       HAL_Delay(1000);
     }
 
-    if(sr04.distance < 500){
-      avoidance_counter = 40;
-    }
-    if(avoidance_counter > 0){
-      if(avoidance_counter > 25) {
-        speed_setpoint = -10;
-        turn_setpoint = 20;
-      } else {
-        speed_setpoint = 10;
+    // avoid obstacle
+    if(flag_avoidance_mode == 1){
+      if (sr04.get_distance() < 500) {
+        avoidance_counter = 16;
       }
-      avoidance_counter--;
-    } else {
-      speed_setpoint = 8;
-      turn_setpoint = 0;
+      if (avoidance_counter > 0) {
+        if (avoidance_counter > 9) {
+          speed_setpoint = -12;
+          turn_setpoint = 20;
+        } else {
+          speed_setpoint = 7;
+        }
+        avoidance_counter--;
+      } else {
+        speed_setpoint = 8;
+        turn_setpoint = 0;
+      }
     }
-
 
     show_debug_info();
     sr04.trigger();
-    HAL_Delay(100);
+    HAL_Delay(50);
 
     /* USER CODE END WHILE */
 
@@ -321,9 +343,13 @@ void show_debug_info(){
   sprintf(ssd1306_buf, "gz%.2f", MPU6050.Gz - 0.91);
   ssd1306_SetCursor(86, 40);
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
-  sprintf(ssd1306_buf, "ds%lu", sr04.distance);
+  sprintf(ssd1306_buf, "ds%lu", sr04.get_distance());
   ssd1306_SetCursor(0, 50);
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
+  if(flag_avoidance_mode == 1){
+    ssd1306_SetCursor(64, 50);
+    ssd1306_WriteString("avm", Font_6x8, White);
+  }
   ssd1306_UpdateScreen();
 }
 
