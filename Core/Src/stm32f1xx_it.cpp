@@ -70,8 +70,7 @@ extern MPU6050_t MPU6050;
 extern SR04 sr04;
 extern PID left_wheel_stand_pid;
 extern PID right_wheel_stand_pid;
-extern PID left_wheel_speed_pid;
-extern PID right_wheel_speed_pid;
+extern PID wheel_speed_pid;
 extern PID left_wheel_turn_pid;
 extern PID right_wheel_turn_pid;
 extern int left_wheel_pidout;
@@ -264,15 +263,14 @@ void EXTI15_10_IRQHandler(void)
     left_wheel.update_speed();
     right_wheel.update_speed();
 
+      // speed PID
+      real_speed_setpoint = smooth_setpoint(speed_setpoint, real_speed_setpoint, 0.02f);
+      float speed_pidout = wheel_speed_pid.calc((left_wheel.speed + right_wheel.speed) / 2, real_speed_setpoint);
+
     // stand PID
     real_angle_setpoint = smooth_setpoint(angle_setpoint, real_angle_setpoint, 0.02f);
-    left_wheel_pidout = left_wheel_stand_pid.calc(MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
-    right_wheel_pidout = right_wheel_stand_pid.calc(MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset);
-
-    // speed PID
-    real_speed_setpoint = smooth_setpoint(speed_setpoint, real_speed_setpoint, 0.02f);
-    left_wheel_pidout += left_wheel_speed_pid.calc(left_wheel.speed, real_speed_setpoint);
-    right_wheel_pidout += right_wheel_speed_pid.calc(left_wheel.speed, real_speed_setpoint);
+    left_wheel_pidout = left_wheel_stand_pid.calc(MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset + speed_pidout);
+    right_wheel_pidout = right_wheel_stand_pid.calc(MPU6050.KalmanAngleX, real_angle_setpoint + angle_offset + speed_pidout);
 
     // turn PID
     speed_diff = left_wheel.speed - right_wheel.speed;

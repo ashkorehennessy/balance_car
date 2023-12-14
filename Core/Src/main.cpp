@@ -52,10 +52,9 @@ MPU6050_t MPU6050;
 SR04 sr04(GPIOA, GPIO_PIN_10, &htim1, TIM_CHANNEL_2);
 Wheel left_wheel(&htim2, &htim1, TIM_CHANNEL_1, GPIOB, GPIO_PIN_15, GPIOB, GPIO_PIN_14);
 Wheel right_wheel(&htim3, &htim1, TIM_CHANNEL_4, GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_12);
-PID left_wheel_stand_pid(240, 0, 1000, 65535, -65535);
-PID right_wheel_stand_pid(240, 0, 1000, 65535, -65535);
-PID left_wheel_speed_pid(-250, 0, 0, 65535, -65535, true, 0.3f);
-PID right_wheel_speed_pid(-250, 0, 0, 65535, -65535, true, 0.3f);
+PID left_wheel_stand_pid(200, 0, 700, 65535, -65535);
+PID right_wheel_stand_pid(200, 0, 700, 65535, -65535);
+PID wheel_speed_pid(-1, -0.005, 1, 65535, -65535, true, 0.9f);
 PID left_wheel_turn_pid(0, 0, 0, 65535, -65535, true, 0.5f);
 PID right_wheel_turn_pid(0, 0, 0, 65535, -65535, true, 0.5f);
 int left_wheel_pidout;
@@ -131,7 +130,7 @@ int main(void)
   ssd1306_UpdateScreen();
   /* Init SSD1306 */
 
-  feedforward = pwm_max_arr * 0.05f;  // ???
+  feedforward = pwm_max_arr * 0.12f;  // ???
   angle_offset = 0.00f;  // angle offset, based on the mpu6050 placement
   speed_setpoint = 0;  // speed setpoint
   angle_setpoint = 0;  // angle setpoint
@@ -310,7 +309,7 @@ void show_debug_info(){
   sprintf(ssd1306_buf, "l%.0f", left_wheel_stand_pid.last_out);
   ssd1306_SetCursor(0, 10);
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
-  sprintf(ssd1306_buf, "%.0f", left_wheel_speed_pid.last_out);
+  sprintf(ssd1306_buf, "%.0f", wheel_speed_pid.last_out);
   ssd1306_SetCursor(44, 10);
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
   sprintf(ssd1306_buf, "%.0f", left_wheel_turn_pid.last_out);
@@ -319,7 +318,7 @@ void show_debug_info(){
   sprintf(ssd1306_buf, "r%.0f", right_wheel_stand_pid.last_out);
   ssd1306_SetCursor(0, 20);
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
-  sprintf(ssd1306_buf, "%.0f", right_wheel_speed_pid.last_out);
+  sprintf(ssd1306_buf, "%.0f", wheel_speed_pid.last_out);
   ssd1306_SetCursor(44, 20);
   ssd1306_WriteString(ssd1306_buf, Font_6x8, White);
   sprintf(ssd1306_buf, "%.0f", right_wheel_turn_pid.last_out);
