@@ -30,6 +30,8 @@ typedef struct
 
     float Temperature;
 
+    double KalmanAngleX_Old;
+    double KalmanAngleY_Old;
     double KalmanAngleX;
     double KalmanAngleY;
     double AngleZ;
